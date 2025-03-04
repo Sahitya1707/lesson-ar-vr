@@ -60,19 +60,14 @@ const createScene = async function () {
   // // STEP 4: Move the box so it is not at your feet
   // box.position.y = 1;
   // box.position.z = 1;
-  // Add this after scene creation but before XR setup
-  let model;
-  BABYLON.SceneLoader.ImportMesh("", "./3d/", "scene.gltf", scene, (meshes) => {
-    model = meshes[0];
-    model.isVisible = false;
 
-    // Scale adjustment - modify based on your model
-    model.scaling = new BABYLON.Vector3(0.5, 0.5, 0.5);
-
-    // Floor alignment adjustment
-    const boundingInfo = model.getBoundingInfo();
-    model.position.y = boundingInfo.minimum.y * model.scaling.y;
-  });
+  BABYLON.SceneLoader.ImportMeshAsync("", "./3d", "scene.gltf", scene).then(
+    (result) => {
+      result.meshes[0].scaling.setAll(MODEL_SCALE);
+      result.meshes[0].setEnabled(false); // Hide until placement
+      currentModel = result.meshes[0];
+    }
+  );
 
   /* SOUNDS
     ---------------------------------------------------------------------------------------------------- */
@@ -139,36 +134,35 @@ const createScene = async function () {
   );
 
   // STEP 8a: Add event listener for click (and simulate this in the Immersive Web Emulator)
-  // Modify the click event listener to use the model instead of box
   canvas.addEventListener("click", () => {
-    if (latestHitTestResults && model) {
-      model.isVisible = true;
+    if (latestHitTestResults && currentModel) {
+      const modelInstance = currentModel.clone("modelInstance");
+      modelInstance.setEnabled(true);
 
-      // Get surface normal
-      const normal = new BABYLON.Vector3();
-      latestHitTestResults[0].transformationMatrix
-        .getRotationMatrix()
-        .getForwardToRef(normal);
-
-      // Position model
-      latestHitTestResults[0].transformationMatrix.decompose(
-        model.scaling,
-        model.rotationQuaternion,
-        model.position
-      );
-
-      // Floor-specific adjustment
-      if (Math.abs(normal.y) > 0.9) {
-        model.position.y += Math.abs(
-          model.getBoundingInfo().boundingBox.extendSize.y
-        );
-      }
+      anchors
+        .addAnchorPointUsingHitTestResultAsync(latestHitTestResults[0])
+        .then((anchor) => {
+          anchor.attachedNode = modelInstance;
+          modelInstance.position.y += modelInstance.scaling.y / 2;
+        });
     }
   });
 
   // Return the scene
   return scene;
 };
+
+const rotationSlider = document.createElement("input");
+rotationSlider.type = "range";
+rotationSlider.min = "0";
+rotationSlider.max = "360";
+document.body.appendChild(rotationSlider);
+
+rotationSlider.addEventListener("input", (e) => {
+  if (currentModel) {
+    currentModel.rotation.y = BABYLON.Tools.ToRadians(e.target.value);
+  }
+});
 
 // Continually render the scene in an endless loop
 createScene().then((sceneToRender) => {
