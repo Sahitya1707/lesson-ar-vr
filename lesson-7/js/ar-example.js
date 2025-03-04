@@ -52,44 +52,27 @@ const createScene = async function () {
 
   /* MESHES
     ---------------------------------------------------------------------------------------------------- */
-
   // STEP 1: Create a simple box, and apply a material and a colour to it.
-  //   const box = BABYLON.MeshBuilder.CreateBox("box", { size: 0.5 }, scene);
-  //   const boxMat = new BABYLON.StandardMaterial("boxMat");
-  //   boxMat.diffuseColor = new BABYLON.Color3(1, 0.647, 0);
-  //   box.material = boxMat;
-  //   // STEP 4: Move the box so it is not at your feet
-  //   box.position.y = 1;
-  //   box.position.z = 1;
+  // const box = BABYLON.MeshBuilder.CreateBox("box", { size: 0.5 }, scene);
+  // const boxMat = new BABYLON.StandardMaterial("boxMat");
+  // boxMat.diffuseColor = new BABYLON.Color3(1, 0.647, 0);
+  // box.material = boxMat;
+  // // STEP 4: Move the box so it is not at your feet
+  // box.position.y = 1;
+  // box.position.z = 1;
+  // Add this after scene creation but before XR setup
+  let model;
+  BABYLON.SceneLoader.ImportMesh("", "./3d/", "scene.gltf", scene, (meshes) => {
+    model = meshes[0];
+    model.isVisible = false;
 
-  // Load the glTF && mESh
-  BABYLON.SceneLoader.ImportMesh(
-    "",
-    "./3d/",
-    "scene.gltf",
-    scene,
-    function (meshes) {
-      let model = meshes[0]; // Get the main mesh
-      model.scaling = new BABYLON.Vector3(0.5, 0.5, 0.5); // Adjust scale
-      model.position.y = 0; // Adjust position to sit on the floor
-      model.rotationQuaternion = null; // Reset rotation if needed
-      model.rotation = new BABYLON.Vector3(0, Math.PI, 0); // Rotate if needed
+    // Scale adjustment - modify based on your model
+    model.scaling = new BABYLON.Vector3(0.5, 0.5, 0.5);
 
-      // Attach model to an anchor if hit-test is available
-      canvas.addEventListener("click", () => {
-        if (latestHitTestResults && latestHitTestResults.length > 0) {
-          anchors
-            .addAnchorPointUsingHitTestResultAsync(latestHitTestResults[0])
-            .then((anchor) => {
-              anchor.attachedNode = model;
-            })
-            .catch((error) => {
-              console.error("Anchor creation error:", error);
-            });
-        }
-      });
-    }
-  );
+    // Floor alignment adjustment
+    const boundingInfo = model.getBoundingInfo();
+    model.position.y = boundingInfo.minimum.y * model.scaling.y;
+  });
 
   /* SOUNDS
     ---------------------------------------------------------------------------------------------------- */
@@ -156,17 +139,30 @@ const createScene = async function () {
   );
 
   // STEP 8a: Add event listener for click (and simulate this in the Immersive Web Emulator)
+  // Modify the click event listener to use the model instead of box
   canvas.addEventListener("click", () => {
-    if (latestHitTestResults && latestHitTestResults.length > 0) {
-      anchors
-        .addAnchorPointUsingHitTestResultAsync(latestHitTestResults[0])
-        .then((anchor) => {
-          anchor.attachedNode = box;
-          box.position.y += box.scaling.y / 2;
-        })
-        .catch((error) => {
-          console.error("Anchor creation error:", error);
-        });
+    if (latestHitTestResults && model) {
+      model.isVisible = true;
+
+      // Get surface normal
+      const normal = new BABYLON.Vector3();
+      latestHitTestResults[0].transformationMatrix
+        .getRotationMatrix()
+        .getForwardToRef(normal);
+
+      // Position model
+      latestHitTestResults[0].transformationMatrix.decompose(
+        model.scaling,
+        model.rotationQuaternion,
+        model.position
+      );
+
+      // Floor-specific adjustment
+      if (Math.abs(normal.y) > 0.9) {
+        model.position.y += Math.abs(
+          model.getBoundingInfo().boundingBox.extendSize.y
+        );
+      }
     }
   });
 
