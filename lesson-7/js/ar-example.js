@@ -61,7 +61,7 @@ const createScene = async function () {
   // box.position.y = 1;
   // box.position.z = 1;
 
-  BABYLON.SceneLoader.ImportMeshAsync("", "./3d", "scene.gltf", scene).then(
+  BABYLON.SceneLoader.ImportMeshAsync("", "./3d/", "scene.gltf", scene).then(
     (result) => {
       result.meshes[0].scaling.setAll(MODEL_SCALE);
       result.meshes[0].setEnabled(false); // Hide until placement
